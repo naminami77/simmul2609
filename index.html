@@ -531,6 +531,7 @@ function baseV(){
   return st;
 }
 const calcShown={N:false,E2:false,X:false};
+let logPending=false;
 function allFilled(){return CALCS[cur].inputs.every(f=>{const v=state[cur][f.id];return v!==undefined&&v!=='';});}
 function updateCalcState(){
   const ok=allFilled();
@@ -557,8 +558,9 @@ function compute(){
   $('compare').innerHTML=`<div class="ch">STEP 3 · ${cmp.header}</div>
     <table><thead><tr><th>${isAdjP?'수정P':'월납'}</th>${cmp.cols.map(x=>`<th>${x.label}</th>`).join('')}</tr></thead>
     <tbody><tr class="tot"><td>수수료</td>${cmp.cols.map(x=>`<td>${won(x.total)}원</td>`).join('')}</tbody></table>`;
-  if(cur==='E2'&&lookup)sendLog(lookup,st.m,r.total);
-  else sendLog({},st.m,r.total);
+  if(cur==='E2'&&lookup){if(logPending)sendLog(lookup,st.m,r.total);}
+  else{if(logPending)sendLog({},st.m,r.total);}
+  logPending=false;
 }
 // ── 이용 기록 적재: Apps Script 웹앱 URL 발급 후 아래에 채워넣으면 조회+계산 시 자동 기록됩니다 ──
 const LOG_ENDPOINT='https://script.google.com/macros/s/AKfycbygi0IpOt4hrQOBP5g3cGl2XuorJdtCOGoKHfyOO1c26MwktKkzxSfG8tmIOiCi4B1S0Q/exec';
@@ -594,7 +596,7 @@ function doLookup(){
   msg.className='msg warn show';msg.textContent='[2차월 이상] 계산기로 연결했습니다.';
   renderTabs();renderCalc();showCalc(true);
 }
-$('calcBtn').onclick=()=>{if(allFilled()){calcShown[cur]=true;updateCalcState();}};
+$('calcBtn').onclick=()=>{if(allFilled()){calcShown[cur]=true;logPending=true;updateCalcState();}};
 $('lookupBtn').onclick=doLookup;
 $('sabun').addEventListener('keydown',e=>{if(e.key==='Enter')doLookup();});
 if(MAINT_MODE){
