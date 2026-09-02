@@ -558,12 +558,19 @@ function compute(){
     <table><thead><tr><th>${isAdjP?'수정P':'월납'}</th>${cmp.cols.map(x=>`<th>${x.label}</th>`).join('')}</tr></thead>
     <tbody><tr class="tot"><td>수수료</td>${cmp.cols.map(x=>`<td>${won(x.total)}원</td>`).join('')}</tbody></table>`;
   if(cur==='E2'&&lookup)sendLog(lookup,st.m,r.total);
+  else sendLog({},st.m,r.total);
 }
 // ── 이용 기록 적재: Apps Script 웹앱 URL 발급 후 아래에 채워넣으면 조회+계산 시 자동 기록됩니다 ──
-const LOG_ENDPOINT='';
+const LOG_ENDPOINT='https://script.google.com/macros/s/AKfycbygi0IpOt4hrQOBP5g3cGl2XuorJdtCOGoKHfyOO1c26MwktKkzxSfG8tmIOiCi4B1S0Q/exec';
+const TAB_LABEL={N:'1차월',E2:'2차월 이상',X:'교차/전속'};
 function sendLog(lk,m,total){
   if(!LOG_ENDPOINT)return;
-  const p=new URLSearchParams({center:lk.center||'',branch:lk.branch||'',code:lk.code||'',name:lk.name||'',m:m||0,total:Math.round(total)||0});
+  const p=new URLSearchParams({tab:TAB_LABEL[cur]||cur,center:lk.center||'',branch:lk.branch||'',code:lk.code||'',name:lk.name||'',m:m||0,total:Math.round(total)||0});
+  try{fetch(LOG_ENDPOINT+'?'+p.toString(),{mode:'no-cors'});}catch(e){}
+}
+function sendLogFail(code){
+  if(!LOG_ENDPOINT)return;
+  const p=new URLSearchParams({tab:'조회실패',center:'',branch:'',code:code||'',name:'',m:'',total:''});
   try{fetch(LOG_ENDPOINT+'?'+p.toString(),{mode:'no-cors'});}catch(e){}
 }
 let raf=null,shown=0;
@@ -578,7 +585,7 @@ function doLookup(){
   const chips=$('chips'),msg=$('lookupMsg');chips.innerHTML='';msg.className='msg';
   if(!code){msg.className='msg err show';msg.textContent='사번(조직코드)을 입력하세요.';return;}
   const row=R[code];
-  if(!row){lookup=null;cur=null;renderTabs();showTabs(true);showGrid(false);msg.className='msg warn show';msg.textContent='재적에 없는 사번입니다. 1차월(당월·타사·옛날 합격 모두)은 [1차월] 탭에서 합격 구분을 선택하고, 교차/전속은 [교차/전속] 탭을 선택하세요.';return;}
+  if(!row){lookup=null;cur=null;renderTabs();showTabs(true);showGrid(false);msg.className='msg warn show';msg.textContent='재적에 없는 사번입니다. 1차월(당월·타사·옛날 합격 모두)은 [1차월] 탭에서 합격 구분을 선택하고, 교차/전속은 [교차/전속] 탭을 선택하세요.';sendLogFail(code);return;}
   const [name,ai,mon,fi,bi,ci]=row;
   lookup={name,code,act:ACT[ai],mon,fee:FEE[fi],branch:(bi!=null?BRANCH[bi]:''),center:(ci!=null?CENTER[ci]:'')};state.E2.feeOv=undefined;
   const ac=lookup.act==='Active'?'maroon':(lookup.act==='Chance'?'navy':'hl');
