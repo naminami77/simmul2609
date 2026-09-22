@@ -118,6 +118,11 @@
   .compare td:first-child,.compare th:first-child{text-align:left;color:var(--ink-soft);font-weight:700}
   .compare tr td{border-top:1px solid var(--line)}
   .compare .tot td{font-weight:800;color:var(--red);background:#FFF6F8}
+  .taxnote{padding:12px 14px 6px;font-size:12.5px;line-height:1.7;color:var(--ink-soft)}
+  .taxrow{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-top:1px solid var(--line)}
+  .taxrow .taxlabel{font-size:13px;font-weight:700;color:var(--ink-soft)}
+  .taxrow .taxamt{font-size:16px;font-weight:800;color:var(--red);font-variant-numeric:tabular-nums}
+  .taxwarn{padding:10px 14px 12px;font-size:11.5px;color:var(--ink-faint);line-height:1.6;border-top:1px solid var(--line)}
   .foot{max-width:1120px;margin:0 auto;padding:0 20px 48px}
   .fnote{background:#FFF9F0;border:1px solid #FCE3C4;border-radius:12px;padding:13px 16px;font-size:12px;color:#8A5A1E;line-height:1.65}
   .fnote b{color:#6B4310}
@@ -327,8 +332,9 @@ const CALCS={
       {id:'track',type:'seg',label:'💰 수수료 유형',sm:'P신인=순수신인(1~12차월) · P프로=13차월 이상 / 경력',opts:['P신인','P프로'],def:'P신인'},
       {id:'meai',type:'seg',label:'📊 MeAI 보장분석',sm:'응시 +3영업일',opts:['충족','미충족'],def:'충족'},
       {id:'pay9',type:'num',label:'📅 응시 9영업일 이내 월납',sm:'플랫폼 시책 #2 기준',def:50000,group:'pay'},
-      {id:'m',type:'num',label:'📅 당월 총 월납',def:50000,group:'pay'},
-      {id:'adjP',type:'num',label:'📅 당월 총 수정보험료 (수정P)',def:120000,group:'pay'},
+      {id:'m',type:'num',label:'📅 당월 총 월납(N잡 실적 현황)',def:50000,group:'pay'},
+      {id:'adjP',type:'num',label:'📅 당월 총 수정보험료(N잡 실적 현황)',def:120000,group:'pay'},
+      {id:'mCert',type:'num',label:'📅 당월 시책 인정 월납',sm:'실손/성공파트너/펫보험 재가입 등 제외. 하단 \'시책 인정 기준\' 참고.',def:50000,group:'pay'},
     ],
     compute(v){
       const seon=(v.bond==='가입'),pro=(v.track==='P프로');
@@ -340,9 +346,9 @@ const CALCS={
       // ③ 13회차 성과: 프로선지급형 한정
       const c8=(seon&&pro)?br(v.adjP,LK.m13_pro):0;
       // 루키 시책(당월 합격만)
-      const s1=(isDang&&v.meai==='충족')?br(v.m,LK.plat1):0;
+      const s1=(isDang&&v.meai==='충족')?br(v.mCert,LK.plat1):0;
       const s2=(isDang&&seon)?br(v.pay9,LK.plat2):0;
-      const s3=isDang?br(v.m,LK.plat3):0;
+      const s3=isDang?br(v.mCert,LK.plat3):0;
       // 1차월 경력 스팟 시책(타사 합격만·4종 공통·월납 기준)
       const spot=isTasa?br(v.m,LK.plat1):0;
       // ② 2~18회차 비례(분급 한정): 신인 7.4/41.7/45.8, 프로 13.3/14.2/15.4
@@ -366,15 +372,16 @@ const CALCS={
         ]};
     },
     compare(st){return {header:'월납별 예상 수수료 예시(수정P = 월납의 2배 예상)',
-      cols:COLS.map(m=>({label:(m/10000)+'만',total:CALCS.N.compute({...st,m,pay9:m,adjP:m*P_MULT}).total})),isAdjP:false};}
+      cols:COLS.map(m=>({label:(m/10000)+'만',total:CALCS.N.compute({...st,m,pay9:m,mCert:m,adjP:m*P_MULT}).total})),isAdjP:false};}
   },
   E2:{title:'2차월 이상 경력',sub:'사번 조회 · 이행보증 가입 여부로 선지급/분급 판정',sabun:true,
     inputs:[
       {id:'bond',type:'seg',label:'🛡️ 이행보증보험',opts:['가입','미가입'],def:'가입'},
       {id:'mo',type:'seg',label:'📊 모바일 고객등록 & MeAI',opts:['충족','미충족'],def:'충족'},
       {id:'consult',type:'seg',label:'📝 모바일 상담신청',sm:'3영업일 가계약',opts:['충족','미충족'],def:'충족'},
-      {id:'m',type:'num',label:'📅 당월 총 월납',def:100000,group:'pay'},
-      {id:'adjP',type:'num',label:'📅 당월 총 수정보험료 (수정P)',def:220000,group:'pay'},
+      {id:'m',type:'num',label:'📅 당월 총 월납(N잡 실적 현황)',def:100000,group:'pay'},
+      {id:'adjP',type:'num',label:'📅 당월 총 수정보험료(N잡 실적 현황)',def:220000,group:'pay'},
+      {id:'mCert',type:'num',label:'📅 당월 시책 인정 월납',sm:'실손/성공파트너/펫보험 재가입 등 제외. 하단 \'시책 인정 기준\' 참고.',def:100000,group:'pay'},
     ],
     compute(v){
       const act=v._act,mon=v._mon,fee=v._fee;
@@ -383,13 +390,13 @@ const CALCS={
       const pb=(fee==='P프로기본형'||fee==='P기본형');
       const c1=seon?(pro?v.adjP*1.667:v.adjP*0.833):(pb?rd(v.adjP*0.133):rd(v.adjP*0.074));
       const c2=(seon&&fee==='P신인선지급형')?br(v.adjP,LK.sinhwalbi):0;
-      const s4=(act==='Active'&&v.mo==='충족')?br(v.m,LK.plat1):0;
-      const s5=(act==='Active'&&v.consult==='충족')?br(v.m,LK.plat2):0;
-      const s6=(act==='Chance'&&v.mo==='충족')?br(v.m,LK.plat2_chance):0;
+      const s4=(act==='Active'&&v.mo==='충족')?br(v.mCert,LK.plat1):0;
+      const s5=(act==='Active'&&v.consult==='충족')?br(v.mCert,LK.plat2):0;
+      const s6=(act==='Chance'&&v.mo==='충족')?br(v.mCert,LK.plat2_chance):0;
       let nm; if(seon){ if(mon>=13)nm=c1+s4+s5+s6; else nm=c1+c2+s4+s5+s6; } else nm=c1+s4+s5+s6;
       const c7=seon?0:((pb?rd(v.adjP*0.133):rd(v.adjP*0.074))*11+(pb?rd(v.adjP*0.142):rd(v.adjP*0.417))*3+(pb?rd(v.adjP*0.154):rd(v.adjP*0.458))*3);
       const c8=(seon&&pro)?br(v.adjP,LK.m13_pro):0;
-      const s9=(act==='Active')?br(v.m,LK.plat3):0;
+      const s9=(act==='Active')?br(v.mCert,LK.plat3):0;
       const yr2=pro?(c8+s9):s9;
       return {totalCap:'수수료/시책 총액',total:nm+c7+yr2,
         subs:[{k:'익월 지급',v:nm},{k:'2차년도 지급',v:yr2,note:'13회차 성과 + 플랫폼 시책 #3'}],
@@ -437,9 +444,12 @@ const CALCS={
       cols:[100000,200000,300000].map(p=>({label:(p/10000)+'만',total:CALCS.X.compute({...st,adjP:p}).total})),isAdjP:true};}
   },
 };
-function getCompare(c,st){
-  if(c.compare)return c.compare(st);
-  return {header:'월납별 예상 수수료 예시(수정P = 월납의 2배 예상)',cols:COLS.map(m=>({label:(m/10000)+'만',total:c.compute({...st,m,adjP:m*P_MULT}).total})),isAdjP:false};
+function taxBreakdown(rows){
+  const isPayMonth=k=>/신계약/.test(k)&&!/13회차/.test(k);
+  const isNextMonth=k=>/지원비/.test(k)||(/플랫폼\s*시책/.test(k)&&/#(1|2)\b/.test(k));
+  let payBase=0,nextBase=0;
+  rows.forEach(row=>{if(isPayMonth(row.k))payBase+=row.v;else if(isNextMonth(row.k))nextBase+=row.v;});
+  return {payBase,nextBase,pay:Math.round(payBase*0.033),next:Math.round(nextBase*0.033)};
 }
 const TAB_ORDER=[['N','1차월'],['E2','2차월 이상'],['X','교차/전속']];
 let cur='E2',lookup=null;
@@ -554,10 +564,15 @@ function compute(){
   if(r.bond)html+=`<div class="row bond"><span class="k">${r.bond.k}</span><span class="v">${won(r.bond.v)}</span></div>`;
   $('rows').innerHTML=html;
   $('rows').querySelectorAll('.detail-btn').forEach(b=>b.onclick=()=>{if(b.dataset.prop)showPropDetail();else showM13Detail(b.dataset.m13);});
-  const cmp=getCompare(c,st),isAdjP=cmp.isAdjP;
-  $('compare').innerHTML=`<div class="ch">STEP 3 · ${cmp.header}</div>
-    <table><thead><tr><th>${isAdjP?'수정P':'월납'}</th>${cmp.cols.map(x=>`<th>${x.label}</th>`).join('')}</tr></thead>
-    <tbody><tr class="tot"><td>수수료</td>${cmp.cols.map(x=>`<td>${won(x.total)}원</td>`).join('')}</tbody></table>`;
+  const tax=taxBreakdown(r.rows);
+  $('compare').innerHTML=`<div class="ch">STEP 3 · 예상 수수료·시책 소득세(3.3%) 안내</div>
+    <div class="taxnote">
+      <div>• 수수료 지급월 : 장기 신계약 성과 수수료 및 비례 수수료의 3.3% 공제</div>
+      <div>• 수수료 지급 익월 : 신인 활동 지원비 및 플랫폼 시책금의 3.3% 공제</div>
+    </div>
+    <div class="taxrow"><span class="taxlabel">지급월 예상 소득세(${won(tax.payBase)}원 × 3.3%)</span><span class="taxamt">${won(tax.pay)}원</span></div>
+    <div class="taxrow"><span class="taxlabel">지급 익월 예상 소득세(${won(tax.nextBase)}원 × 3.3%)</span><span class="taxamt">${won(tax.next)}원</span></div>
+    <div class="taxwarn">※ 위 소득세는 수수료 지급 시 자동 차감됩니다. 단, 해당 월 발생 수수료가 0원인 경우 직접 입금이 필요하며 개별 안내 드립니다.</div>`;
   if(cur==='E2'&&lookup){if(logPending)sendLog(lookup,st.m,r.total);}
   else{if(logPending)sendLog({},st.m,r.total);}
   logPending=false;
@@ -619,7 +634,7 @@ function cardTheme(){
 function rr(g,x,y,w,h,r){r=Math.min(r,h/2,w/2);g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
 const LOGO=(typeof Image==='function')?new Image():null; if(LOGO)LOGO.src=LOGO_SRC;
 async function ensureLogo(){ if(!LOGO||LOGO.naturalWidth)return; await new Promise(res=>{let d=false;const f=()=>{if(!d){d=true;res();}};LOGO.onload=f;LOGO.onerror=f;setTimeout(f,700);}); }
-const DISCL=['※ 상기 금액은 세금 공제 전 금액입니다.','※ 수수료는 계약이 정상 유지되는 것을 전제로 지급되며 미유지 시 환수가 발생될 수 있습니다.','※ 2차년도 시책은 해당 계약이 13회차 정상 유지 시 익월에 지급됩니다.'];
+const DISCL=['※ 위 소득세는 수수료 지급 시 자동 차감됩니다. 단, 해당 월 발생 수수료가 0원인 경우 직접 입금이 필요하며 개별 안내 드립니다.','※ 수수료는 계약이 정상 유지되는 것을 전제로 지급되며 미유지시 환수가 발생될 수 있습니다.','※ 2차년도 시책은 해당 계약이 13회차 정상 유지 시 익월에 지급됩니다.'];
 function wrapText(g,t,mw){const out=[];let ln='';for(const ch of t){const ts=ln+ch;if(g.measureText(ts).width>mw&&ln){out.push(ln);ln=ch;}else ln=ts;}if(ln)out.push(ln);return out;}
 function cardData(){
   const c=CALCS[cur],st=baseV(),r=c.compute(st);
@@ -630,9 +645,9 @@ function cardData(){
   const eyebrow=(c.sabun&&lookup)?(lookup.mon+'차월 / '+lookup.act):(cur==='N'?'1차월':c.title);
   const title=name?name+'님 예상 수수료·시책':'예상 수수료·시책 안내';
   const ctxt=(st.m!==undefined)?('월납 '+won(st.m)+'원(수정P '+won(st.adjP)+'원) 체결 시'):('수정P '+won(st.adjP)+'원 체결 시');
-  const cmp=getCompare(c,st);
+  const tax=taxBreakdown(r.rows);
   const d=new Date(),ds=d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0');
-  return {c,st,r,name,rows,eyebrow,title,ctxt,cmp,ds,branch,total:won(r.total)};
+  return {c,st,r,name,rows,eyebrow,title,ctxt,tax,ds,branch,total:won(r.total)};
 }
 // 공통 섹션
 function secBrand(g,yy,tag){g.textAlign='left';
@@ -644,15 +659,15 @@ function secDiv(g,yy){g.strokeStyle='#EFEFF1';g.lineWidth=1.5;g.beginPath();g.mo
 function secRows(g,yy,rows){g.textAlign='left';g.fillStyle='#16181D';g.font='800 34px '+F;g.fillText('🧾 지급 내역',x0,yy);yy+=54;
   rows.forEach(row=>{g.fillStyle='#3B4048';g.font='600 30px '+F;g.textAlign='left';g.fillText('🔹 '+row.k.replace(/^[①-⑳]\s*/,''),x0,yy);
   g.fillStyle='#16181D';g.font='800 30px '+F;g.textAlign='right';g.fillText(won(row.v)+'원',x0+cw,yy);g.textAlign='left';yy+=66;});return yy;}
-function secCmp(g,yy,cmp){g.fillStyle='#16181D';g.font='800 34px '+F;g.textAlign='left';g.fillText('📊 '+cmp.header,x0,yy);yy+=54;
-  const nCol=cmp.cols.length,labW=140,colW=(cw-labW)/nCol,thh=48,trr=56;
-  g.strokeStyle='#E8EAED';g.lineWidth=1.5;rr(g,x0,yy,cw,thh+trr,12);g.stroke();
-  g.strokeStyle='#EFEFF1';g.beginPath();g.moveTo(x0,yy+thh);g.lineTo(x0+cw,yy+thh);g.stroke();
-  g.fillStyle='#5B6068';g.font='700 22px '+F;g.textAlign='left';g.fillText(cmp.isAdjP?'수정P':'월납',x0+18,yy+14);
-  g.textAlign='right';cmp.cols.forEach((col,i)=>g.fillText(col.label,x0+labW+(i+1)*colW-16,yy+14));
-  const ry=yy+thh;g.fillStyle='#16181D';g.font='800 24px '+F;g.textAlign='left';g.fillText('수수료',x0+18,ry+16);
-  g.fillStyle=CTHEME.main;g.textAlign='right';cmp.cols.forEach((col,i)=>g.fillText(won(col.total)+'원',x0+labW+(i+1)*colW-16,ry+16));
-  g.textAlign='left';return yy+thh+trr+30;}
+function secTax(g,yy,tax){g.fillStyle='#16181D';g.font='800 34px '+F;g.textAlign='left';g.fillText('💰 예상 소득세(3.3%)',x0,yy);yy+=54;
+  const rh=64,boxH=rh*2;
+  g.strokeStyle='#E8EAED';g.lineWidth=1.5;rr(g,x0,yy,cw,boxH,12);g.stroke();
+  g.strokeStyle='#EFEFF1';g.beginPath();g.moveTo(x0,yy+rh);g.lineTo(x0+cw,yy+rh);g.stroke();
+  g.font='700 24px '+F;g.fillStyle='#3B4048';g.textAlign='left';g.fillText('지급월 예상 소득세('+won(tax.payBase)+'원 × 3.3%)',x0+18,yy+38);
+  g.font='800 28px '+F;g.fillStyle=CTHEME.main;g.textAlign='right';g.fillText(won(tax.pay)+'원',x0+cw-18,yy+38);
+  g.font='700 24px '+F;g.fillStyle='#3B4048';g.textAlign='left';g.fillText('지급 익월 예상 소득세('+won(tax.nextBase)+'원 × 3.3%)',x0+18,yy+rh+38);
+  g.font='800 28px '+F;g.fillStyle=CTHEME.main;g.textAlign='right';g.fillText(won(tax.next)+'원',x0+cw-18,yy+rh+38);
+  g.textAlign='left';return yy+boxH+30;}
 function secFoot(g,yy,dl,ds,branch){g.fillStyle='#5B6068';g.font='500 22px '+F;g.textAlign='left';dl.forEach(l=>{g.fillText(l,x0,yy);yy+=34;});
   yy+=40;g.fillStyle='#16181D';g.font='700 24px '+F;g.textAlign='left';g.fillText('제공 일자  '+ds,x0,yy);
   if(branch){g.fillStyle='#16181D';g.font='700 24px '+F;g.textAlign='right';g.fillText(branch,x0+cw,yy);g.textAlign='left';}
@@ -671,7 +686,7 @@ function tplA(g,D,dl){let yy=OUT+IN;
     g.fillStyle=cc[1];g.font='700 24px '+F;g.textAlign='left';g.fillText(s.k,sx+26,yy+36);
     g.fillStyle='#16181D';g.font='800 44px '+F;g.fillText(won(s.v)+'원',sx+26,yy+100);
     if(s.note){g.fillStyle='#5B6068';g.font='500 21px '+F;g.fillText(s.note,sx+26,yy+156);}});yy+=subH+44;
-  yy=secDiv(g,yy);yy=secRows(g,yy,D.rows);yy+=20;yy=secCmp(g,yy,D.cmp);yy=secFoot(g,yy,dl,D.ds,D.branch);return yy;}
+  yy=secDiv(g,yy);yy=secRows(g,yy,D.rows);yy+=20;yy=secTax(g,yy,D.tax);yy=secFoot(g,yy,dl,D.ds,D.branch);return yy;}
 
 // 템플릿 B · 프렌들리 (사이드 밴드 히어로 + 클래식 본문 · 정보 요소 tplA와 동일)
 function tplB(g,D,dl){let yy=OUT+IN;
@@ -700,7 +715,7 @@ function tplB(g,D,dl){let yy=OUT+IN;
     g.fillStyle=cc[1];g.font='700 24px '+F;g.textAlign='left';g.fillText(s.k,sx+26,yy+36);
     g.fillStyle='#16181D';g.font='800 44px '+F;g.fillText(won(s.v)+'원',sx+26,yy+100);
     if(s.note){g.fillStyle='#5B6068';g.font='500 21px '+F;g.fillText(s.note,sx+26,yy+156);}});yy+=subH+44;
-  yy=secDiv(g,yy);yy=secRows(g,yy,D.rows);yy+=20;yy=secCmp(g,yy,D.cmp);yy=secFoot(g,yy,dl,D.ds,D.branch);return yy;}
+  yy=secDiv(g,yy);yy=secRows(g,yy,D.rows);yy+=20;yy=secTax(g,yy,D.tax);yy=secFoot(g,yy,dl,D.ds,D.branch);return yy;}
 
 // 템플릿 C · 메트릭 (지표 그리드)
 function tplC(g,D,dl){let yy=OUT+IN;
@@ -720,7 +735,7 @@ function tplC(g,D,dl){let yy=OUT+IN;
     g.fillText(lab,tx+20,ty+22);
     g.fillStyle='#16181D';g.font='800 34px '+F;g.fillText(won(t.v)+'원',tx+20,ty+54);});
   yy+=Math.ceil(tiles.length/2)*(th+gap)+4;
-  yy=secCmp(g,yy,D.cmp);yy=secFoot(g,yy,dl,D.ds,D.branch);return yy;}
+  yy=secTax(g,yy,D.tax);yy=secFoot(g,yy,dl,D.ds,D.branch);return yy;}
 
 const TPL={A:tplA,B:tplB,C:tplC};
 let cardTpl='A',cardBlob=null;
