@@ -567,12 +567,11 @@ function compute(){
   const tax=taxBreakdown(r.rows);
   $('compare').innerHTML=`<div class="ch">STEP 3 · 예상 수수료·시책 소득세(3.3%) 안내</div>
     <div class="taxnote">
-      <div>• 수수료 지급월 : 장기 신계약 성과 수수료 및 비례 수수료의 3.3% 공제</div>
-      <div>• 수수료 지급 익월 : 신인 활동 지원비 및 플랫폼 시책금의 3.3% 공제</div>
+      <div>• 장기 신계약 성과 수수료 및 비례 수수료 : 지급월에 공제</div>
+      <div>• 신인 활동 지원비 및 플랫폼 시책금, 학습 리워드 : 지급 익월에 공제</div>
     </div>
     <div class="taxrow"><span class="taxlabel">지급월 예상 소득세(${won(tax.payBase)}원 × 3.3%)</span><span class="taxamt">${won(tax.pay)}원</span></div>
-    <div class="taxrow"><span class="taxlabel">지급 익월 예상 소득세(${won(tax.nextBase)}원 × 3.3%)</span><span class="taxamt">${won(tax.next)}원</span></div>
-    <div class="taxwarn">※ 위 소득세는 수수료 지급 시 자동 차감됩니다. 단, 해당 월 발생 수수료가 0원인 경우 직접 입금이 필요하며 개별 안내 드립니다.</div>`;
+    <div class="taxrow"><span class="taxlabel">지급 익월 예상 소득세(${won(tax.nextBase)}원 × 3.3%)</span><span class="taxamt">${won(tax.next)}원</span></div>`;
   if(cur==='E2'&&lookup){if(logPending)sendLog(lookup,st.m,r.total);}
   else{if(logPending)sendLog({},st.m,r.total);}
   logPending=false;
