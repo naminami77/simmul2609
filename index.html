@@ -199,7 +199,7 @@
       <div class="lookup-row">
         <input type="text" id="sabun" inputmode="numeric" placeholder="사번(조직코드) 입력" autocomplete="off">
         <button id="lookupBtn">조회</button>
-        <button id="recentBtn" class="ghost-btn">🕘 이전 기록 조회</button>
+        <button id="recentBtn" class="ghost-btn" style="display:none">🕘 이전 기록 조회</button>
       </div>
       <div class="recent" id="recent"></div>
       <div class="chips" id="chips"></div>
@@ -632,6 +632,7 @@ function removeRecent(code){
   const list=getRecent().filter(x=>x.code!==code);
   try{localStorage.setItem(RECENT_KEY,JSON.stringify(list));}catch(e){}
   renderRecent();
+  updateRecentBtn();
 }
 function renderRecent(explicit){
   const box=$('recent');if(!box)return;
@@ -669,6 +670,7 @@ function doLookup(){
   const [name,ai,mon,fi,bi,ci]=row;
   lookup={name,code,act:ACT[ai],mon,fee:FEE[fi],branch:(bi!=null?BRANCH[bi]:''),center:(ci!=null?CENTER[ci]:'')};state.E2.feeOv=undefined;
   saveRecent(code,name);
+  updateRecentBtn();
   const ac=lookup.act==='Active'?'maroon':(lookup.act==='Chance'?'navy':'hl');
   chips.innerHTML=`<span class="chip"><b>${name}</b></span><span class="chip">차월 <b>${mon}</b></span><span class="chip ${ac}">${lookup.act}</span><span class="chip blue">${lookup.fee}</span>`;
   cur='E2';
@@ -678,8 +680,14 @@ function doLookup(){
 $('calcBtn').onclick=()=>{if(allFilled()){calcShown[cur]=true;logPending=true;updateCalcState();}};
 $('lookupBtn').onclick=doLookup;
 $('sabun').addEventListener('keydown',e=>{if(e.key==='Enter')doLookup();});
-$('sabun').addEventListener('input',()=>renderRecent(false));
+function updateRecentBtn(){
+  const typed=($('sabun').value||'').trim().replace(/\D/g,'');
+  const has=!MAINT_MODE&&typed&&getRecent().some(x=>x.code===typed);
+  $('recentBtn').style.display=has?'':'none';
+}
+$('sabun').addEventListener('input',()=>{renderRecent(false);updateRecentBtn();});
 $('recentBtn').onclick=()=>renderRecent(true);
+updateRecentBtn();
 if(MAINT_MODE){
   $('lookupBtn').disabled=true;
   $('lookupBtn').textContent='업데이트 중';
