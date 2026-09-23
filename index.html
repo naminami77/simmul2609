@@ -40,6 +40,12 @@
   .lookup-row input:disabled{background:#f1f2f5;color:var(--ink-faint);cursor:not-allowed}
   .lookup-hint{margin-top:12px;font-size:12.5px;color:var(--ink-faint);font-weight:600;line-height:1.5}
   .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .recent{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .recent .rlabel{font-size:11.5px;color:var(--ink-faint);align-self:center;margin-right:2px}
+  .recent .rchip{display:flex;align-items:center;gap:6px;background:#F7F8FA;border:1px solid var(--line);border-radius:999px;padding:5px 6px 5px 12px;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer}
+  .recent .rchip:active{background:#EFEFF1}
+  .recent .rchip .rdel{display:flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;color:var(--ink-faint);font-size:11px;font-weight:800}
+  .recent .rchip .rdel:hover{background:#E4E6EA}
   .chip{font-size:13px;font-weight:700;padding:6px 12px;border-radius:999px;background:#F2F3F5;color:var(--ink-soft)}
   .chip b{color:var(--ink)}
   .chip.hl{background:var(--red-soft);color:var(--red-dark)}
@@ -192,6 +198,7 @@
         <input type="text" id="sabun" inputmode="numeric" placeholder="사번(조직코드) 입력" autocomplete="off">
         <button id="lookupBtn">조회</button>
       </div>
+      <div class="recent" id="recent"></div>
       <div class="chips" id="chips"></div>
       <div class="msg" id="lookupMsg"></div>
     </div>
@@ -418,10 +425,10 @@ const CALCS={
       {id:'prevM',type:'num',label:'전월 월납보험료',sm:'연속가동 판정',def:50000},
       {id:'curM',type:'num',label:'당월 월납보험료',sm:'연속가동 시책',def:200000},
       {id:'adjP',type:'num',label:'당월 수정보험료 (수정P)',sm:'장기신계약·13회차',def:400000},
-      {id:'w1',type:'num',label:'1주차 실적',sm:'전략 상품·본인 계약 제외',def:50000},
-      {id:'w2',type:'num',label:'2주차 실적',sm:'전략 상품·본인 계약 제외',def:0},
-      {id:'w3',type:'num',label:'3주차 실적',sm:'전략 상품·본인 계약 제외',def:100000},
-      {id:'w4',type:'num',label:'4주차 실적',sm:'전략 상품·본인 계약 제외',def:50000},
+      {id:'w1',type:'num',label:'1주차 실적',sm:'하단 \'시책 인정 기준\' 참고',def:50000},
+      {id:'w2',type:'num',label:'2주차 실적',sm:'하단 \'시책 인정 기준\' 참고',def:0},
+      {id:'w3',type:'num',label:'3주차 실적',sm:'하단 \'시책 인정 기준\' 참고',def:100000},
+      {id:'w4',type:'num',label:'4주차 실적',sm:'하단 \'시책 인정 기준\' 참고',def:50000},
     ],
     compute(v){
       const c1=v.rate*v.adjP;
@@ -574,7 +581,7 @@ function compute(){
     </div>
     <div class="taxrow"><span class="taxlabel">지급월 예상 소득세(${won(tax.payBase)}원 × 3.3%)</span><span class="taxamt">${won(tax.pay)}원</span></div>
     <div class="taxrow"><span class="taxlabel">지급 익월 예상 소득세(${won(tax.nextBase)}원 × 3.3%)</span><span class="taxamt">${won(tax.next)}원</span></div>`;
-  if(cur==='E2'&&lookup){if(logPending)sendLog(lookup,st.m,r.total);}
+  if(cur==='E2'&&lookup){if(logPending){sendLog(lookup,st.m,r.total);saveRecentValues(lookup.code,{mo:st.mo,consult:st.consult,m:st.m,adjP:st.adjP,mCert:st.mCert});}}
   else{if(logPending)sendLog({},st.m,r.total);}
   logPending=false;
 }
@@ -590,6 +597,50 @@ function sendLogFail(code){
   if(!LOG_ENDPOINT)return;
   const p=new URLSearchParams({tab:'조회실패',center:'',branch:'',code:code||'',name:'',m:'',total:''});
   try{fetch(LOG_ENDPOINT+'?'+p.toString(),{mode:'no-cors'});}catch(e){}
+}
+// ── 최근 조회 사번: 기기(브라우저)별로 최대 5건 저장 ──
+const RECENT_KEY='mp_recent_lookups';
+function getRecent(){try{return JSON.parse(localStorage.getItem(RECENT_KEY))||[];}catch(e){return [];}}
+function saveRecent(code,name){
+  const existing=getRecent().find(x=>x.code===code);
+  let list=getRecent().filter(x=>x.code!==code);
+  const entry={code,name};
+  if(existing&&existing.values)entry.values=existing.values;
+  list.unshift(entry);
+  list=list.slice(0,5);
+  try{localStorage.setItem(RECENT_KEY,JSON.stringify(list));}catch(e){}
+  renderRecent();
+}
+function saveRecentValues(code,values){
+  const list=getRecent();
+  const idx=list.findIndex(x=>x.code===code);
+  if(idx===-1)return;
+  list[idx].values=values;
+  try{localStorage.setItem(RECENT_KEY,JSON.stringify(list));}catch(e){}
+}
+function removeRecent(code){
+  const list=getRecent().filter(x=>x.code!==code);
+  try{localStorage.setItem(RECENT_KEY,JSON.stringify(list));}catch(e){}
+  renderRecent();
+}
+function renderRecent(){
+  const box=$('recent');if(!box)return;
+  if(MAINT_MODE){box.innerHTML='';return;}
+  const typed=($('sabun').value||'').trim().replace(/\D/g,'');
+  if(!typed){box.innerHTML='';return;}
+  const list=getRecent().filter(x=>x.code===typed);
+  if(!list.length){box.innerHTML='';return;}
+  box.innerHTML='<span class="rlabel">이전 조회 기록</span>'+list.map(x=>
+    `<span class="rchip" data-code="${x.code}"><span class="rname">${x.name} · ${x.code}${x.values?' (입력값 복원)':''}</span><span class="rdel" data-del="${x.code}">×</span></span>`
+  ).join('');
+  box.querySelectorAll('.rname').forEach(el=>el.onclick=()=>{
+    const code=el.parentElement.dataset.code;
+    const entry=getRecent().find(x=>x.code===code);
+    $('sabun').value=code;
+    if(entry&&entry.values)Object.assign(state.E2,entry.values);
+    doLookup();
+  });
+  box.querySelectorAll('.rdel').forEach(el=>el.onclick=(e)=>{e.stopPropagation();removeRecent(el.dataset.del);});
 }
 let raf=null,shown=0;
 function countTo(t){cancelAnimationFrame(raf);
@@ -607,6 +658,7 @@ function doLookup(){
   if(!row){lookup=null;cur=null;renderTabs();showTabs(true);showGrid(false);msg.className='msg warn show';msg.textContent='재적에 없는 사번입니다. 1차월(당월·타사·옛날 합격 모두)은 [1차월] 탭에서 합격 구분을 선택하고, 교차/전속은 [교차/전속] 탭을 선택하세요.';sendLogFail(code);return;}
   const [name,ai,mon,fi,bi,ci]=row;
   lookup={name,code,act:ACT[ai],mon,fee:FEE[fi],branch:(bi!=null?BRANCH[bi]:''),center:(ci!=null?CENTER[ci]:'')};state.E2.feeOv=undefined;
+  saveRecent(code,name);
   const ac=lookup.act==='Active'?'maroon':(lookup.act==='Chance'?'navy':'hl');
   chips.innerHTML=`<span class="chip"><b>${name}</b></span><span class="chip">차월 <b>${mon}</b></span><span class="chip ${ac}">${lookup.act}</span><span class="chip blue">${lookup.fee}</span>`;
   cur='E2';
@@ -616,6 +668,7 @@ function doLookup(){
 $('calcBtn').onclick=()=>{if(allFilled()){calcShown[cur]=true;logPending=true;updateCalcState();}};
 $('lookupBtn').onclick=doLookup;
 $('sabun').addEventListener('keydown',e=>{if(e.key==='Enter')doLookup();});
+$('sabun').addEventListener('input',renderRecent);
 if(MAINT_MODE){
   $('lookupBtn').disabled=true;
   $('lookupBtn').textContent='업데이트 중';
@@ -791,6 +844,7 @@ $('introModal').addEventListener('click',e=>{if(e.target===$('introModal'))$('in
   }
 })();
 $('maintClose').onclick=()=>$('maintModal').classList.remove('show');
+renderRecent();
 $('maintModal').addEventListener('click',e=>{if(e.target===$('maintModal'))$('maintModal').classList.remove('show');});
 $('critBtn').onclick=()=>$('critModal').classList.add('show');
 $('critClose').onclick=()=>$('critModal').classList.remove('show');
