@@ -37,8 +37,7 @@
   .lookup-row button{font-family:inherit;font-size:15px;font-weight:700;color:#fff;background:var(--red);border:none;padding:12px 22px;border-radius:11px;cursor:pointer}
   .lookup-row button:active{background:var(--red-dark)}
   .lookup-row button:disabled{background:#b9bcc6;cursor:not-allowed}
-  .lookup-row button.ghost-btn{background:#fff;color:var(--red);border:1.5px solid var(--red)}
-  .lookup-row button.ghost-btn:active{background:#FFF6F8}
+
   .lookup-row input:disabled{background:#f1f2f5;color:var(--ink-faint);cursor:not-allowed}
   .lookup-hint{margin-top:12px;font-size:12.5px;color:var(--ink-faint);font-weight:600;line-height:1.5}
   .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
@@ -199,7 +198,6 @@
       <div class="lookup-row">
         <input type="text" id="sabun" inputmode="numeric" placeholder="사번(조직코드) 입력" autocomplete="off">
         <button id="lookupBtn">조회</button>
-        <button id="recentBtn" class="ghost-btn" style="display:none">🕘 이전 기록 조회</button>
       </div>
       <div class="recent" id="recent"></div>
       <div class="chips" id="chips"></div>
@@ -608,7 +606,10 @@ function saveRecent(code,name){
   const existing=getRecent().find(x=>x.code===code);
   let list=getRecent().filter(x=>x.code!==code);
   const entry={code,name,ts:Date.now()};
-  if(existing&&existing.values)entry.values=existing.values;
+  if(existing){
+    if(existing.values)entry.values=existing.values;
+    entry.lastTs=existing.ts;//직전 방문 시각을 보존 (지금 이 순간이 아님)
+  }
   list.unshift(entry);
   list=list.slice(0,5);
   try{localStorage.setItem(RECENT_KEY,JSON.stringify(list));}catch(e){}
@@ -619,7 +620,6 @@ function saveRecentValues(code,values){
   const idx=list.findIndex(x=>x.code===code);
   if(idx===-1)return;
   list[idx].values=values;
-  list[idx].ts=Date.now();
   try{localStorage.setItem(RECENT_KEY,JSON.stringify(list));}catch(e){}
 }
 function fmtTs(ts){
@@ -632,17 +632,16 @@ function removeRecent(code){
   const list=getRecent().filter(x=>x.code!==code);
   try{localStorage.setItem(RECENT_KEY,JSON.stringify(list));}catch(e){}
   renderRecent();
-  updateRecentBtn();
 }
-function renderRecent(explicit){
+function renderRecent(){
   const box=$('recent');if(!box)return;
   if(MAINT_MODE){box.innerHTML='';return;}
   const typed=($('sabun').value||'').trim().replace(/\D/g,'');
-  if(!typed){box.innerHTML=explicit?'<span class="rlabel">사번을 먼저 입력해 주세요.</span>':'';return;}
-  const list=getRecent().filter(x=>x.code===typed);
-  if(!list.length){box.innerHTML=explicit?'<span class="rlabel">이전 조회 기록이 없습니다.</span>':'';return;}
+  if(!typed){box.innerHTML='';return;}
+  const list=getRecent().filter(x=>x.code===typed&&x.lastTs);
+  if(!list.length){box.innerHTML='';return;}
   box.innerHTML=list.map(x=>
-    `<span class="rchip" data-code="${x.code}"><span class="rname">이전 조회 일시: ${fmtTs(x.ts)} (동일 브라우저 기준)${x.values?' · 입력값 복원':''}</span><span class="rdel" data-del="${x.code}">×</span></span>`
+    `<span class="rchip" data-code="${x.code}"><span class="rname">이전 조회 일시: ${fmtTs(x.lastTs)} (동일 브라우저 기준)${x.values?' · 입력값 복원':''}</span><span class="rdel" data-del="${x.code}">×</span></span>`
   ).join('');
   box.querySelectorAll('.rname').forEach(el=>el.onclick=()=>{
     const code=el.parentElement.dataset.code;
@@ -670,7 +669,6 @@ function doLookup(){
   const [name,ai,mon,fi,bi,ci]=row;
   lookup={name,code,act:ACT[ai],mon,fee:FEE[fi],branch:(bi!=null?BRANCH[bi]:''),center:(ci!=null?CENTER[ci]:'')};state.E2.feeOv=undefined;
   saveRecent(code,name);
-  updateRecentBtn();
   const ac=lookup.act==='Active'?'maroon':(lookup.act==='Chance'?'navy':'hl');
   chips.innerHTML=`<span class="chip"><b>${name}</b></span><span class="chip">차월 <b>${mon}</b></span><span class="chip ${ac}">${lookup.act}</span><span class="chip blue">${lookup.fee}</span>`;
   cur='E2';
@@ -680,14 +678,7 @@ function doLookup(){
 $('calcBtn').onclick=()=>{if(allFilled()){calcShown[cur]=true;logPending=true;updateCalcState();}};
 $('lookupBtn').onclick=doLookup;
 $('sabun').addEventListener('keydown',e=>{if(e.key==='Enter')doLookup();});
-function updateRecentBtn(){
-  const typed=($('sabun').value||'').trim().replace(/\D/g,'');
-  const has=!MAINT_MODE&&typed&&getRecent().some(x=>x.code===typed);
-  $('recentBtn').style.display=has?'':'none';
-}
-$('sabun').addEventListener('input',()=>{renderRecent(false);updateRecentBtn();});
-$('recentBtn').onclick=()=>renderRecent(true);
-updateRecentBtn();
+$('sabun').addEventListener('input',renderRecent);
 if(MAINT_MODE){
   $('lookupBtn').disabled=true;
   $('lookupBtn').textContent='업데이트 중';
