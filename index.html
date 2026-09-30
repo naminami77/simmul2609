@@ -299,6 +299,14 @@
   </div>
 </div>
 
+<div class="modal" id="alertModal">
+  <div class="modal-box">
+    <div class="intro-title" id="alertTitle">⚠️ 확인해 주세요</div>
+    <div class="intro-text" id="alertText"></div>
+    <div class="modal-actions"><button class="btn-save" id="alertOk">확인</button></div>
+  </div>
+</div>
+
 
 <div class="modal" id="cardModal">
   <div class="modal-box">
@@ -461,7 +469,7 @@ function taxBreakdown(rows){
   return {payBase,nextBase,pay:Math.round(payBase*0.033),next:Math.round(nextBase*0.033)};
 }
 const TAB_ORDER=[['N','1차월'],['E2','2차월 이상'],['X','교차/전속']];
-let cur='E2',lookup=null;
+let cur='E2',lookup=null,certWarned=false;
 const state={N:{},E2:{},X:{}};
 const $=id=>document.getElementById(id);
 
@@ -521,6 +529,10 @@ function renderCalc(){
       const inp=document.createElement('input');inp.type='text';inp.className='numin';inp.inputMode='numeric';inp.placeholder='입력';
       inp.value=(st[f.id]!==undefined?Number(st[f.id]).toLocaleString('ko-KR'):'');
       inp.oninput=()=>{const raw=inp.value.replace(/[^0-9]/g,'');if(raw===''){delete st[f.id];inp.value='';}else{const n=+raw;st[f.id]=n;inp.value=n.toLocaleString('ko-KR');}updateCalcState();refreshGlow();};field.appendChild(inp);
+      if(cur==='E2'&&f.id==='mCert'){
+        inp.onfocus=()=>{const eff=st.feeOv||(lookup&&lookup.fee)||'';if(!certWarned&&/P프로/.test(eff)){showAlert('경력자 및 13차월 이상은 본인 계약 시책 인정 안됩니다. 확인 하셨나요?');certWarned=true;}};
+        inp.addEventListener('blur',()=>{if(st.mCert!==undefined&&st.m!==undefined&&st.mCert>st.m){showAlert('시책 인정 월납은 당월 총 월납보다 높을 수 없습니다.');delete st.mCert;inp.value='';updateCalcState();refreshGlow();}});
+      }
     }
     box.appendChild(field);
   });
@@ -667,7 +679,7 @@ function doLookup(){
   const row=R[code];
   if(!row){lookup=null;cur=null;renderTabs();showTabs(true);showGrid(false);msg.className='msg warn show';msg.textContent='재적에 없는 사번입니다. 1차월(당월·타사·옛날 합격 모두)은 [1차월] 탭에서 합격 구분을 선택하고, 교차/전속은 [교차/전속] 탭을 선택하세요.';sendLogFail(code);return;}
   const [name,ai,mon,fi,bi,ci]=row;
-  lookup={name,code,act:ACT[ai],mon,fee:FEE[fi],branch:(bi!=null?BRANCH[bi]:''),center:(ci!=null?CENTER[ci]:'')};state.E2.feeOv=undefined;
+  lookup={name,code,act:ACT[ai],mon,fee:FEE[fi],branch:(bi!=null?BRANCH[bi]:''),center:(ci!=null?CENTER[ci]:'')};state.E2.feeOv=undefined;certWarned=false;
   saveRecent(code,name);
   const ac=lookup.act==='Active'?'maroon':(lookup.act==='Chance'?'navy':'hl');
   chips.innerHTML=`<span class="chip"><b>${name}</b></span><span class="chip">차월 <b>${mon}</b></span><span class="chip ${ac}">${lookup.act}</span><span class="chip blue">${lookup.fee}</span>`;
@@ -854,6 +866,9 @@ $('introModal').addEventListener('click',e=>{if(e.target===$('introModal'))$('in
   }
 })();
 $('maintClose').onclick=()=>$('maintModal').classList.remove('show');
+function showAlert(text,title){$('alertTitle').textContent=title||'⚠️ 확인해 주세요';$('alertText').innerHTML=text;$('alertModal').classList.add('show');}
+$('alertOk').onclick=()=>$('alertModal').classList.remove('show');
+$('alertModal').addEventListener('click',e=>{if(e.target===$('alertModal'))$('alertModal').classList.remove('show');});
 renderRecent();
 $('maintModal').addEventListener('click',e=>{if(e.target===$('maintModal'))$('maintModal').classList.remove('show');});
 $('critBtn').onclick=()=>$('critModal').classList.add('show');
